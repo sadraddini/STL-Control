@@ -7,10 +7,11 @@ M=100
 from gurobipy import *
 import random
 
-class system:
+class STL_system:
 	def __init__(self):
 		self.model=Model("STL_Spec")
 		self.x={}
+		self.u={}
 		self.y={}
 		self.z={}
 		self.T=0
@@ -32,81 +33,77 @@ class system:
 			for i in range(1,self.m+1):
 				self.u[i,t]=self.model.addVar(lb=-GRB.INFINITY,ub=GRB.INFINITY,name="u(%d,%d)"%(i,t))
 			for i in range(1,self.p+1):
-				self.y[i,t]=self.model.addVar(lb=-GRB.INFINITY,ub=GRB.INFINITY,name="z(%d,%d)"%(i,t))
+				self.y[i,t]=self.model.addVar(lb=-GRB.INFINITY,ub=GRB.INFINITY,name="y(%d,%d)"%(i,t))
 				self.z[i,t]=self.model.addVar(vtype=GRB.BINARY, name="z(%d,%d)"%(i,t))
 		self.model.update()
-		# predicates are formulas!
-		for i in range(1,self.p+1):
-			self.formulas[i]={}
-			for t in range(0,self.T+1):
-				self.formulas[i][t]=self.model.addVar(lb=0,ub=1,name="predicate(%d,%d)"%(i,t))
-				self.model.update()
-				self.model.addConstr (self.formulas[i][t]==self.y[i,t])
-		
-			
+		# Dynamics
+		for t in range(0,self.T):
+			for i in range(1,self.n+1):
+				s=LinExpr()
+				for j in range(1,self.n+1):
+					s.addTerms(self.A[i,j],self.x[j,t])
+				for j in range(1,self.m+1):
+					s.addTerms(self.B[i,j],self.u[j,t])
+				self.model.addConstr (self.x[i,t+1]==s + self.c[i,1])
+	
 	def add_formula(self,string):
-		self.formulas[string]={}
+		self.formulas[string]="STL formula"
 		for t in range(0,self.T+1):
-			self.formulas[string][t]=self.model.addVar(lb=0,ub=1,name="z^%s(%d)"%(string,t))
+			self.z[string,t]=self.model.addVar(lb=0,ub=1,name="z^%s(%d)"%(string,t))
 		self.model.update()
 
-			
-		
-	
 	def integer_encoding(self):
 		for k in self.y.keys():
 			self.model.addConstr ( self.y[k] >= - M + M * self.z[k])
 			self.model.addConstr ( self.y[k] <=	  M * self.z[k])
 	
-	def add_secondary_signal_state(i,list1,list2,g):
+	def add_secondary_signal_state(self,i,vec,g):
 		"""
 		input: 
-			list1: indices of state
-			list 2: repsective coefficients
-			g: constant
+			vec: coeffieicents (list), g: constant
 		output:
-			y=list 2 * x + g
+			y=vec * x + g
 		"""
-		s=LinExpr()
 		for t in range(0,self.T+1):
-			for j in list1:
-				s.addTerms(self.list2[j], self.x[j,t])
+			s=LinExpr()
+			for j in range(1,self.n+1):
+				s.addTerms(vec[j-1], self.x[j,t])
 			self.model.addConstr( self.y[i,t]== s + g)
+		self.formulas[i]="predicate %d"%i
 
-	def add_secondary_signal_control(i,list1,list2,g):
+	def add_secondary_signal_control(self,i,vec,g):
 		"""
 		input: 
-			list1: indices of controls
-			list 2: repsective coefficients
-			g: constant
+			vec: coeffieicents (list), g: constant
 		output:
-			y=list 2 * u + g > 0
+			y=vec * u + g
 		"""
-		s=LinExpr()
 		for t in range(0,self.T+1):
-			for j in list1:
-				s.addTerms(self.list2[j], self.u[j,y])
+			s=LinExpr()
+			for j in range(1,self.m+1):
+				s.addTerms(vec[j-1], self.u[j,t])
 			self.model.addConstr( self.y[i,t]== s + g)
+		self.formulas[i]="predicate %d"%i
 	
 	def conjunction(self,phi_out,list):
 		if not phi_out in self.formulas.keys():
 			raise "Error! phi_out not declared as a formula"
-		for f in list:
-			s=LinExpr()
-			for t in range(0,self.T+1): 
-				self.model.addConstr(z[phi_out][t] <= z[f][t])
-				s.add(z[f][t])
-			self.model.addConstr(z[phi_out][t] >= s - len(list) + 1 )
+		for t in range(0,self.T+1): 
+			for f in list:
+				s=LinExpr()
+				self.model.addConstr(self.z[phi_out,t] <= self.z[f,t])
+				s.add(self.z[f,t])
+			self.model.addConstr(self.z[phi_out,t] >= s - len(list) + 1 )
 
 	def disjunction(self,phi_out,list):
 		if not phi_out in self.formulas.keys():
 			raise "Error! phi_out not declared as a formula"
-		for f in list:
-			s=LinExpr()
-			for t in range(0,self.T+1): 
-				self.model.addConstr(z[phi_out][t] >= z[f][t])
-				s.add(z[f][t])
-			self.model.addConstr(z[phi_out][t] <= s)
+		for t in range(0,self.T+1): 
+			for f in list:
+				s=LinExpr()
+				self.model.addConstr(self.z[phi_out,t] >= self.z[f,t])
+				s.add(self.z[f,t])
+			self.model.addConstr(self.z[phi_out,t] <= s)
 			
 	def always(self,phi_out,phi_in,interval):
 		if not phi_out in self.formulas.keys():
@@ -116,9 +113,9 @@ class system:
 		for t in range(0,self.T+1-interval[len(interval)-1]):	
 			s=LinExpr()
 			for tau in interval:	
-				self.model.addConstr(z[phi_out][t] <= z[phi_in][tau])
-				s.add(z[phi_in][tau])
-			self.model.addConstr(z[phi_out][t] >= s - len(interval) + 1 )		
+				self.model.addConstr(self.z[phi_out,t] <= self.z[phi_in,tau])
+				s.add(self.z[phi_in,tau])
+			self.model.addConstr(self.z[phi_out,t] >= s - len(interval) + 1 )	   
 		
 	def eventually(self,phi_out,phi_in,interval):
 		if not phi_out in self.formulas.keys():
@@ -128,7 +125,41 @@ class system:
 		for t in range(0,self.T+1-interval[len(interval)-1]):	
 			s=LinExpr()
 			for tau in interval:	
-				self.model.addConstr(z[phi_out][t] >= z[phi_in][tau])
-				s.add(z[phi_in][tau])
-			self.model.addConstr(z[phi_out][t] <= s )		
-		
+				self.model.addConstr(self.z[phi_out,t] >= self.z[phi_in,tau])
+				s.add(self.z[phi_in,tau])
+			self.model.addConstr(self.z[phi_out,t] <= s )	 
+			
+	def solve(self,phi_out):
+		self.model.addConstr(self.z[phi_out,0] == 1 )
+		self.model.optimize()  
+		  
+
+def show_matrix(X):
+	row=0
+	column=0
+	for k in X.keys():
+		row=max(row,k[0])
+		column=max(column,k[1])
+	for i in range(1,row+1):
+		for j in range(1,column+1):
+			print X[i,j],"	",
+		print "\n"
+
+def complete_matrix(X):
+	"""
+	input: X: sparse matrix
+	output: Y: same matrix with zeros completed
+	"""
+	Y={}
+	row=0
+	column=0
+	for k in X.keys():
+		row=max(row,k[0])
+		column=max(column,k[1])
+	for i in range(1,row+1):
+		for j in range(1,column+1):
+			if (i,j) in X.keys():
+				Y[i,j]=X[i,j]
+			else:
+				Y[i,j]=0
+	return Y	
