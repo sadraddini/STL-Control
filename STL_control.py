@@ -8,7 +8,7 @@ from gurobipy import *
 import random
 
 class STL_system:
-	def __init__(self):
+	def __init__(self,n,m,p):
 		self.model=Model("STL_Spec")
 		self.x={}
 		self.u={}
@@ -24,6 +24,10 @@ class STL_system:
 		self.F={}
 		self.g={}
 		self.formulas={} #key: name, val: dictionary of t variables
+		self.n=n
+		self.m=m
+		self.p=p
+		self.add_variables()
 		
 	
 	def add_variables(self): 
@@ -45,6 +49,11 @@ class STL_system:
 				for j in range(1,self.m+1):
 					s.addTerms(self.B[i,j],self.u[j,t])
 				self.model.addConstr (self.x[i,t+1]==s + self.c[i,1])
+	
+	def initial_condition(self,vec):
+		for i in range(1,self.n+1):
+			self.model.addConstr (self.x[i,0]==vec[i-1])
+			
 	
 	def add_formula(self,string):
 		self.formulas[string]="STL formula"
@@ -130,8 +139,10 @@ class STL_system:
 			self.model.addConstr(self.z[phi_out,t] <= s )	 
 			
 	def solve(self,phi_out):
+		self.integer_encoding()
 		self.model.addConstr(self.z[phi_out,0] == 1 )
-		self.model.optimize()  
+		self.model.optimize()
+	  
 		  
 
 def show_matrix(X):
