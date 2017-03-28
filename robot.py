@@ -21,7 +21,7 @@ s.c[2,1]=0
 s.c[4,1]=0
 
 
-s.T=40
+s.T=25
 
 s.A=complete_matrix(s.A)
 s.B=complete_matrix(s.B)
@@ -48,10 +48,10 @@ s.add_secondary_signal_state(10,[-1,0,0,0],2)   # -x+2>0 --> 2>x
 s.add_secondary_signal_state(11,[0,0,1,0],-7)   # y-7>0 --> y>7
 s.add_secondary_signal_state(12,[0,0,-1,0],8)   # -y +8 > 0 --> 8>y
 
-s.add_secondary_signal_control(13,[1,0],100)    # u+100>0 --> u>-100
-s.add_secondary_signal_control(14,[-1,0],100)   # -u+100>0 --> 100>u
-s.add_secondary_signal_control(15,[0,1],100)
-s.add_secondary_signal_control(16,[0,-1],100)
+s.add_secondary_signal_control(13,[1,0],20)    # u+100>0 --> u>-100
+s.add_secondary_signal_control(14,[-1,0],20)   # -u+100>0 --> 100>u
+s.add_secondary_signal_control(15,[0,1],20)
+s.add_secondary_signal_control(16,[0,-1],20)
 
 s.add_formula("obstacle")
 s.disjunction("obstacle",[1,2,3,4])
@@ -74,7 +74,8 @@ s.always("phi_4","controls",range(0,s.T))
 s.add_formula("phi_whole")
 s.conjunction("phi_whole",["phi_1","phi_2","phi_3","phi_4"])
 
-s.initial_condition([2,0,0,0])
+s.initial_condition([1,0,4,0])
+s.integer_encoding()
 s.solve("phi_whole")
 s.write_to_file()
 

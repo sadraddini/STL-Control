@@ -68,10 +68,8 @@ s.always("phi_4","controls",range(0,s.T))
 s.add_formula("phi_whole")
 s.conjunction("phi_whole",["phi_1","phi_2","phi_3","phi_4"])
 
-# s.add_formula("phi_whole")
-# s.conjunction("phi_whole",["phi_1","phi_2","phi_4"])
 s.integer_encoding()
-# s.initial_condition([5,8])
+s.initial_condition([2,5])
 s.solve("phi_whole")
 s.write_to_file()
 
