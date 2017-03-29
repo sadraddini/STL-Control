@@ -176,6 +176,7 @@ class STL_system:
             for i in range(1,self.n+1):
                 f.write("%0.2f "%self.x[i,t].X)
             f.write("\n")
+        f.close()
 
 def show_matrix(X):
     row=0
