@@ -1,5 +1,8 @@
 from STL_control import *
 from rci_family import *
+import math as m
+
+pi=3.1415
 
 s=STL_system(4,2,16)
 
@@ -65,9 +68,9 @@ s.conjunction("phi_whole",["phi_1","phi_2","phi_3","phi_4"])
 
 s.initial_condition([0,0,0,0])
 s.integer_encoding()
-# s.solve("phi_whole")
-# s.write_to_file()
-# 
+s.solve("phi_whole")
+s.write_to_file()
+ 
 # print "robustness was",s.r.X
 # for t in range(0,s.T):
 #	  print t,"x:",s.x[1,t].X,"vx:",s.x[2,t].X," y:",s.x[3,t].X,"vy:",s.x[4,t].X, "ux:", s.u[1,t].X, "uy:", s.u[2,t].X
@@ -89,12 +92,12 @@ tube.A=s.A
 tube.B=s.B
 tube.F={}
 tube.g={}
-scale_w=0.2
+scale_w=1
 for i in range(1,s.n+1):
 	tube.F[2*i-1,i]=1
 	tube.F[2*i,i]=-1
-	tube.g[2*i-1]=1*scale_w
-	tube.g[2*i]=1*scale_w
+	tube.g[2*i-1]=0.1*scale_w
+	tube.g[2*i]=0.1*scale_w
 tube.F=complete_matrix(tube.F)
 
 tube.H=s.Ex
@@ -115,8 +118,28 @@ for j in range(1,tube.m+1):
 		
 tube.RCI()
 tube.compute_D()
-print "beta is",tube.beta
-print "gamma is",tube.gamma
+
+d={}
+N=8
+vertices=[]
+for theta_1 in range(0,N):
+	for theta_2 in range(0,N):
+		for theta_3 in range(0,N):	
+			scale=2*pi/N
+			d[1]=m.cos(theta_1*scale)*m.cos(theta_2*scale)*m.cos(theta_3*scale)
+			d[2]=m.sin(theta_1*scale)*m.cos(theta_2*scale)*m.cos(theta_3*scale)
+			d[3]=m.sin(theta_2*scale)*m.cos(theta_3*scale)
+			d[4]=m.sin(theta_3*scale)
+			v=tube.RCI_vertex(d)
+			if not v in vertices:
+				vertices.append(v)
+
+f=open("tube_vertices.txt","w")				
+for v in vertices:
+	for i in range(1,len(v)+1):
+		f.write("%0.2f "%v[i])
+	f.write("\n")
+f.close()
 
 f=open("tube_state.txt","w")
 tube.x=tube.mu
@@ -128,6 +151,7 @@ for t in range(0,s.T+1):
 	tube.evolve()
 f.close()
 	
-	
+print "\nbeta is",tube.beta
+print "gamma is",tube.gamma	
 	
 	

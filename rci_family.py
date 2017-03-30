@@ -123,8 +123,10 @@ class system:
 		model=Model("RCIS")
 		
 		# These are new!
-		self.beta=model.addVar(lb=0,ub=GRB.INFINITY,obj=1)
-		self.gamma=model.addVar(lb=0,ub=GRB.INFINITY,obj=1)
+		self.beta=model.addVar(lb=0,ub=GRB.INFINITY)
+		self.gamma=model.addVar(lb=0,ub=GRB.INFINITY)
+		self.rho=model.addVar(lb=0,ub=GRB.INFINITY,obj=1)
+		
 		
 		for i in range(1,self.n+1):
 			xbar[i]=model.addVar(lb=-GRB.INFINITY,ub=GRB.INFINITY)
@@ -158,10 +160,10 @@ class system:
 				s.addTerms(self.B[i,j], ubar[j])
 			model.addConstr(s == xbar[i])
 		
-#		  for i in range(1,self.n+1):
-#			  model.addConstr(xbar[i]==0)
-#		  for j in range(1,self.m+1):
-#			  model.addConstr(ubar[j]==0)
+		for i in range(1,self.n+1):
+			model.addConstr(xbar[i]==0)
+		for j in range(1,self.m+1):
+			model.addConstr(ubar[j]==0)
 		
 		# Equation 4.9-1
 		# Lambda * g <= alpha * g
@@ -244,6 +246,9 @@ class system:
 					for p in range(1,self.m+1): 
 						rightHand.addTerms(self.P[i,p],M[k,p,j])
 					model.addConstr( leftHand == rightHand)			   
+		
+		model.addConstr( self.rho >= self.beta)
+		model.addConstr( self.rho >= self.gamma)	
 		
 		model.optimize()
 		if model.Status==3:
@@ -369,7 +374,7 @@ class system:
 		print "randomized the disturbance!:",
 		xnew={}
 		for i in range(1,self.n+1):
-			xnew[i]=w[i].X*0.99*random.random()
+			xnew[i]=w[i].X*0.99#*random.random()
 			print xnew[i],
 			for p in range(1,self.n+1):
 				xnew[i]+=self.A[i,p]*self.x[p]
@@ -377,7 +382,43 @@ class system:
 				xnew[i]+=self.B[i,p]*self.u[p]
 		self.x=xnew
 	######################### END IMPLEMENATION ##########################					
-					
+
+	def RCI_vertex(self,direction):
+		w={}
+		x={}
+		model=Model("RCIS_check")
+		for k in range(0,self.K):
+			for i in range(1,self.n+1):
+				w[k,i]=model.addVar(lb=-GRB.INFINITY,ub=GRB.INFINITY)
+		
+		for i in range(1,self.n+1):
+			x[i]=model.addVar(lb=-GRB.INFINITY,ub=GRB.INFINITY, obj=direction[i])
+			
+		model.update()
+		# x bar = x + D * w
+		for i in range(1,self.n+1):
+			s=LinExpr()
+			for k in range(0,self.K):
+				for p in range(1,self.n+1):
+					s.addTerms(self.D[k,i,p], w[k,p])
+			model.addConstr(s + self.xbar[i] == x[i])
+		
+#		model.addConstr(x[4]==0)
+#		model.addConstr(x[2]==0)
+		
+		# w in (1-alpha)^-1 W
+		for k in range(0,self.K):
+			for i in range(1,self.nW+1):
+				s=LinExpr()
+				for p in range(1,self.n+1):
+					s.addTerms(self.F[i,p],w[k,p])
+				model.addConstr( (1-self.alpha)*s <= self.g[i])
+		
+		model.optimize()
+		vertex={}
+		for i in range(1,self.n+1):
+			vertex[i]=x[i].X
+		return vertex			
 					
 		
 		
